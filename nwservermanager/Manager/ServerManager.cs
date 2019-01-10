@@ -139,6 +139,11 @@ namespace nwservermanager.Manager
                                 dead.Add(item.Key);
                                 continue;
                             }
+                            else if (item.Value.State == ClientState.Ok && !_validator.ServerIsAllowed(item.Value.ServerId))
+                            {
+                                dead.Add(item.Key);
+                                continue;
+                            }
 
                             string value = item.Value.Tick();
                             if (value != null)
