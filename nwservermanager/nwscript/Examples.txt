@@ -1,0 +1,30 @@
+﻿
+Starting the backend client:
+
+	//The server ID here *must* be a GUID thats specified in clients.json on the serverside
+	StartBackendCliet("14f3a874-224b-49fc-9437-37452926d37f", "localhost", "backend");
+
+Sending a message:
+
+	CreateMessageData();
+	AddMessageData("Name", GetName(oSender));
+	AddMessageData("Tag", GetTag(oSender));
+	AddMessageData("Player", GetPCPlayerName(oSender));
+	AddMessageData("CDKey", GetPCPublicCDKey(oSender));
+	//This call fails if the target client is not considered connected to the backend or if we arent connected
+	if(SendMessageToServer("14f3a874-224b-49fc-9437-37452926d37e", ObjectToString(oSender))){
+		SendMessageToPC(oSender, "Message sent successfully");
+	}
+	else{
+		SendMessageToPC(oSender, "Message not delivered");
+	}
+
+clients.json is a file that will exist in the same folder as servermanager.exe
+it contains which serverids are allowed and their names
+see https://www.guidgenerator.com/ on how to generate a guid
+Example clients.json:
+
+{
+  "14f3a874-224b-49fc-9437-37452926d37e": "Test console",
+  "14f3a874-224b-49fc-9437-37452926d37f": "Test nwserver"
+}
