@@ -156,12 +156,12 @@ namespace nwservermanager.Manager
                                         if (!_validator.ServerIsAllowed(serverid))
                                         {
                                             _feedback.WriteLine("Unauthorized: {0} -> {1}", item.Value.IP, serverid);
-                                            item.Value.Kill();
+                                            item.Value.Kill("Unauthorized");
                                         }
                                         else if (_clients.Any(i => i.Value.ServerId == serverid && i.Value.State == ClientState.Ok))
                                         {
                                             _feedback.WriteLine("Already connected: {0} -> {1}", item.Value.IP, serverid);
-                                            item.Value.Kill();
+                                            item.Value.Kill("Already connected");
                                         }
                                         else
                                         {
@@ -173,35 +173,42 @@ namespace nwservermanager.Manager
                                     else
                                     {
                                         _feedback.WriteLine("No proper serverid given: {0} -> {1}", item.Value.IP, value);
-                                        item.Value.Kill();
+                                        item.Value.Kill("No valid serverid given");
                                     }
                                 }
                                 else if (!ProcessRequest(item.Value, value))
                                 {
-                                    item.Value.Kill();
+                                    item.Value.Kill("Request failed");
                                 }
                             }
                         }
                         catch (Exception ex)
                         {
                             _feedback.Error(ex, false);
-                            item.Value.Kill();
+                            item.Value.Kill(ex.Message);
                         }
                     }
 
                     if (dead.Any())
                     {
+                        bool fromOkState = false;
+
                         dead.ForEach(i =>
                         {
                             if (_clients.TryRemove(i, out ServerClient dying))
                             {
-                                _feedback.WriteLine("Disconnecting: {0}", dying);
+                                _feedback.WriteLine("Disconnecting: {0} ({1})", dying, dying.DeathReason ?? "Disconnected");
+                                fromOkState = fromOkState || dying.DeathState == ClientState.Ok;
                                 dying.Dispose();
                             }
                         });
                         dead.Clear();
 
-                        SendClientListToEveryone();
+                        //Only send refresh of the clients if it was an established connection that died
+                        if (fromOkState)
+                        {
+                            SendClientListToEveryone();
+                        }
                     }
                 }
                 catch (Exception ex)

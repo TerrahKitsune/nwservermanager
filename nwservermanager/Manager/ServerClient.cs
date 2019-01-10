@@ -39,7 +39,8 @@ namespace nwservermanager.Manager
         }
 
         public IPAddress IP { get; }
-
+        public string DeathReason { get; private set; }
+        public ClientState? DeathState { get; private set; }
         public Guid ServerId { get; private set; }
         public Guid SessionId { get; private set; }
         public ClientState State { get; private set; }
@@ -47,6 +48,7 @@ namespace nwservermanager.Manager
 
         public ServerClient(TcpClient client, TimeSpan timeout)
         {
+            DeathReason = null;
             _timeout = timeout;
             _stream = null;
             SessionId = Guid.NewGuid();
@@ -89,15 +91,17 @@ namespace nwservermanager.Manager
                 {
                     _client.Client.Send(buffer);
                 }
-                catch
+                catch(Exception ex)
                 {
-                    Kill();
+                    Kill(ex.Message);
                 }
             }
         }
 
-        public void Kill()
+        public void Kill(string reason)
         {
+            DeathReason = DeathReason ?? reason;
+            DeathState = DeathState ?? State;
             State = ClientState.Dead;
             _client?.Dispose();
             _client = null;
@@ -113,15 +117,15 @@ namespace nwservermanager.Manager
                 {
                     if(LastActivity > _extendedTimeout)
                     {
-                        Kill();
+                        Kill("Timeout");
                     }
 
                     return null;
                 }
             }
-            catch
+            catch(Exception ex)
             {
-                Kill();
+                Kill(ex.Message);
                 return null;
             }
 
@@ -134,9 +138,9 @@ namespace nwservermanager.Manager
                         return null;
                     }
                 }
-                catch
+                catch(Exception ex)
                 {
-                    Kill();
+                    Kill(ex.Message);
                     return null;
                 }
 
@@ -145,9 +149,9 @@ namespace nwservermanager.Manager
                 {
                     _client.Client.Receive(rawheader);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    Kill();
+                    Kill(ex.Message);
                     return null;
                 }
 
@@ -162,7 +166,7 @@ namespace nwservermanager.Manager
 
             if (read <= 0)
             {
-                Kill();
+                Kill("No bytes available on stream");
                 return null;
             }
             else

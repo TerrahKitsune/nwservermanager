@@ -12,7 +12,7 @@ namespace nwservermanager
     {
         static void Main(string[] args)
         {
-            IFeedback fb = new ConsoleFeedback();
+            IFeedback fb = new ConsoleFeedback("nwn2server backend");
 
             using (ServerManager manager = new ServerManager(19836, new JsonFileValidator("clients.json",fb), fb))
             {

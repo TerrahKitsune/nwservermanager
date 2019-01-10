@@ -39,12 +39,15 @@ end
 
 events[NETEVENT_CONNECTED] = function(srv, ev)
 
+	srv.Clients = {};
 	srv.HalfOpen = true;
 	srv.sessionid = nil;
 	srv:ResetPing();
 end
 
 events[NETEVENT_DISCONNECTED] = function(srv, ev)
+
+	srv.Clients = {};
 
 	if srv.sessionid == nil or srv.HalfOpen == true then	
 		return;
@@ -90,6 +93,10 @@ end
 
 function server:SendMessageToTarget(target, parameter, data)
 
+	if not self:GetConnectedServer(target) then 
+		return false;
+	end 
+
 	data = data or {};
 	parameter = parameter or "";
 	
@@ -98,10 +105,25 @@ function server:SendMessageToTarget(target, parameter, data)
 	self:Send(self.JSON:encode(transmission));
 	
 	self:ResetPing();
+
+	return true;
 end
 
-function server:IsConnected()
+function server:GetConnectedServer(serverid)
 
+	local connected, err = self.socket:Status();
+
+	if not connected then 
+		return nil;
+	elseif self.HalfOpen then
+		return nil; 
+	elseif not self.sessionid then 
+		return nil;
+	end
+
+	serverid = serverid or self.id;
+
+	return self.Clients[serverid];
 end
 
 server.PingTime = Timer.New();
@@ -154,9 +176,14 @@ function server:Tick()
 			--print(msg);
 			local ok, data = pcall(self.JSON.decode, self.JSON, msg);
 		
-			if not ok then 
+			if not ok or type(data.Action) ~= "number" then 
 				print(data);
 			else
+				
+				if data.Action == 5 and data.Data then 
+					self.Clients = data.Data;
+				end
+
 				self.RecvProc(data);
 			end
 		end

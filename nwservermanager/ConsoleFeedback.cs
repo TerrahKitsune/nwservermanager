@@ -9,6 +9,11 @@ namespace nwservermanager
 {
     public class ConsoleFeedback : IFeedback
     {
+        public ConsoleFeedback(string title)
+        {
+            Console.Title = title;
+        }
+
         public void Error(Exception ex, bool isCritical)
         {
             lock (this)

@@ -34,7 +34,8 @@ string GetNextBackendDataKey();
 
 //Send a message with the parameter to the target server
 //Use CreateMessageData and AddMessageData to add additional data
-void SendMessageToServer(string sServerId, string sParameter);
+//Returns false if the message could not be sent
+int SendMessageToServer(string sServerId, string sParameter);
 
 //Creates a data object that contains additional data to be sent in a SendMessageToServer call
 //use AddMessageData to add data to the object
@@ -42,6 +43,15 @@ void CreateMessageData();
 
 //Adds data to the additional data to be sent
 void AddMessageData(string sKey, string sValue);
+
+//Checks to see if a server is considered connected, you can also use this with your own serverid
+//This returns the name of serverId if it is connected otherwise it returns an empty string
+string GetServerIsConnected(string serverId);
+
+string GetServerIsConnected(string serverId){
+
+	return RunLuaString("return Env.Get('serverclient'):IsConnected('"+serverId+"') or '';");
+}
 
 string GetFirstBackendDataKey(){
 
@@ -63,9 +73,9 @@ void CreateMessageData(){
 	RunLuaString("local e=Env.Get('serverclient'); e.DATA={};");
 }
 
-void SendMessageToServer(string sServerId, string sParameter)
+int SendMessageToServer(string sServerId, string sParameter)
 {
-	RunLuaString("local e=Env.Get('serverclient'); e:SendMessageToTarget('"+sServerId+"', '"+sParameter+"', e.DATA); e.DATA=nil;");	
+	return StringToInt(RunLuaString("local e=Env.Get('serverclient'); local r=e:SendMessageToTarget('"+sServerId+"', '"+sParameter+"', e.DATA); e.DATA=nil; return r;"));	
 }
 
 string GetLastBackendData(string sKey){
