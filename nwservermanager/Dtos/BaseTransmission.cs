@@ -14,6 +14,7 @@ namespace nwservermanager.Dtos
         ClientConnected = 3,
         ClientDisconnected = 4,
         GetAllConnectedClients = 5,
+        WebRequest = 6,
     }
 
     public class BaseTransmission

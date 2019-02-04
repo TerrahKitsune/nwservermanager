@@ -16,12 +16,16 @@ namespace nwservermanager.Manager
         private readonly TcpListener _listener;
         private readonly Thread _thread;
         private readonly ConcurrentDictionary<Guid, ServerClient> _clients;
+        private readonly List<Dtos.WebRequest> _webrequests;
         private volatile bool _alive;
         private readonly IServerValidator _validator;
         private readonly IFeedback _feedback;
+        private TimeSpan _timeout;
 
         public ServerManager(int port, IServerValidator validator, IFeedback fb)
         {
+            _timeout = TimeSpan.FromSeconds(15);
+            _webrequests = new List<Dtos.WebRequest>();
             _feedback = fb ?? throw new NullReferenceException("No feedback provided");
             _validator = validator ?? throw new NullReferenceException("No validator provided");
             _clients = new ConcurrentDictionary<Guid, ServerClient>();
@@ -54,10 +58,73 @@ namespace nwservermanager.Manager
             }
         }
 
+        public BaseTransmission SetWebRequest(Guid id, Guid target, string ip, string request, string body, Dictionary<string, string> headers)
+        {
+
+            ServerClient targetcli = GetClientFromClientId(target);
+
+            if(targetcli == null)
+            {
+                return null;
+            }
+
+            headers = headers ?? new Dictionary<string, string>();
+
+            if (headers.ContainsKey("IP"))
+            {
+                headers.Remove("IP");
+            }
+
+            if (headers.ContainsKey("BODY"))
+            {
+                headers.Remove("BODY");
+            }
+
+            headers.Add("IP", ip);
+            headers.Add("BODY", body ?? "");
+
+            Dtos.WebRequest webrequest = new Dtos.WebRequest(new BaseTransmission
+            {
+                Action = (int)ActionEnum.WebRequest,
+                Data = headers,
+                SessionId = targetcli.SessionId,
+                Parameter = request,
+                TargetServerId = id
+            }, id);
+
+            lock (_webrequests)
+            {
+                _webrequests.Add(webrequest);
+            }
+
+            targetcli?.Send(Newtonsoft.Json.JsonConvert.SerializeObject(webrequest.Request));
+
+            while (webrequest.Response == null)
+            {
+                Thread.Sleep(1);
+                if(webrequest.Age > _timeout)
+                {
+                    lock (_webrequests)
+                    {
+                        _webrequests.Remove(webrequest);
+                    }
+
+                    throw new TimeoutException("Request timed out");
+                }
+            }
+
+            lock (_webrequests)
+            {
+                _webrequests.Remove(webrequest);
+            }
+
+            return webrequest.Response;
+        }
+
         private bool ProcessRequest(ServerClient from, string raw)
         {
             try
-            {
+            { 
                 _feedback.WriteLine("Request: {0} -> {1}", from, raw);
 
                 BaseTransmission request = Newtonsoft.Json.JsonConvert.DeserializeObject<BaseTransmission>(raw);
@@ -81,6 +148,23 @@ namespace nwservermanager.Manager
                         Parameter = request.Parameter,
                         TargetServerId = from.ServerId
                     }));
+                }
+                else if (action == ActionEnum.WebRequest)
+                {
+                    Dtos.WebRequest webRequest;
+
+                    lock (_webrequests)
+                    {
+                        webRequest = _webrequests
+                            .Where(i => i.Response == null && i.Request.TargetServerId == request.TargetServerId)
+                            .OrderByDescending(i => i.Age)
+                            .FirstOrDefault();
+                    }
+
+                    if(webRequest != null)
+                    {
+                        webRequest.SetResponse(request);
+                    }
                 }
                 else if (action == ActionEnum.GetAllConnectedClients)
                 {
@@ -125,7 +209,7 @@ namespace nwservermanager.Manager
                 {
                     if (_listener.Pending())
                     {
-                        ServerClient client = new ServerClient(_listener.AcceptTcpClient(), TimeSpan.FromSeconds(10));
+                        ServerClient client = new ServerClient(_listener.AcceptTcpClient(), _timeout);
                         _feedback.WriteLine("Connecting: {0}", client);
                         _clients.TryAdd(client.SessionId, client);
                     }

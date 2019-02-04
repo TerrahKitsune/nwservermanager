@@ -50,6 +50,7 @@
   <ItemGroup>
     <Compile Include="ConsoleFeedback.cs" />
     <Compile Include="Dtos\BaseTransmission.cs" />
+    <Compile Include="Dtos\WebRequest.cs" />
     <Compile Include="JsonFileValidator.cs" />
     <Compile Include="Manager\IFeedback.cs" />
     <Compile Include="Manager\IServerValidator.cs" />

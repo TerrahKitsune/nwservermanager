@@ -16,6 +16,11 @@ local function Recv(msg)
 
 	print("Message: ");
 	printtbl(msg);
+
+	if msg.Action == 6 then 
+		print("Web request from: "..msg.Data.IP);
+		cli:SendMessageToTarget(msg.TargetServerId, msg.Parameter .." -> ".. msg.Data.BODY, msg.Data);
+	end
 end
 
 local function Connect(msg)
@@ -36,7 +41,7 @@ while true do
 	
 	if HasKeyDown() then
 		local key = string.char(GetKey());
-		if not cli:SendMessageToTarget("14f3a874-224b-49fc-9437-37452926d37f", "keypress", {Bla=123, Data=key}) then 
+		if not cli:SendMessageToTarget("14f3a874-224b-49fc-9437-37452926d37f", "Press", {Key=key}) then 
 			print("Message not delivered");
 		end
 	end

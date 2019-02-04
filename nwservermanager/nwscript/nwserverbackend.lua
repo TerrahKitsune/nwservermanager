@@ -34,6 +34,8 @@ local function Assemble()
 		return msg;
 	end 
 	
+	--print("Msg: END");
+
 	return nil;
 end
 
@@ -100,7 +102,15 @@ function server:SendMessageToTarget(target, parameter, data)
 	data = data or {};
 	parameter = parameter or "";
 	
-	local transmission = {SessionId=self.sessionid, TargetServerId=target, Action=2, Parameter=parameter, Data=data};
+	local act;
+
+	if self.WebClient and self.WebClient == target then 
+		act = 6;
+	else 
+		act = 2;
+	end
+
+	local transmission = {SessionId=self.sessionid, TargetServerId=target, Action=act, Parameter=parameter, Data=data};
 	
 	self:Send(self.JSON:encode(transmission));
 	
@@ -123,7 +133,11 @@ function server:GetConnectedServer(serverid)
 
 	serverid = serverid or self.id;
 
-	return self.Clients[serverid];
+	if self.WebClient and self.WebClient == serverid then 
+		return self.WebClientIP;
+	else 
+		return self.Clients[serverid];
+	end
 end
 
 server.PingTime = Timer.New();
@@ -138,9 +152,13 @@ function server:Ping()
 
 	if self.PingTime:Elapsed() >= 5000 then 
 	
-		local transmission = {SessionId=self.sessionid, TargetServerId="00000000-0000-0000-0000-000000000000", Action=0, Parameter="ping", Data={}};
+		if server:GetConnectedServer() then
+
+			local transmission = {SessionId=self.sessionid, TargetServerId="00000000-0000-0000-0000-000000000000", Action=0, Parameter="ping", Data={}};
 	
-		self:Send(self.JSON:encode(transmission));
+			self:Send(self.JSON:encode(transmission));
+		end
+
 		self:ResetPing();
 	end
 end
@@ -150,6 +168,7 @@ function server:Tick()
 	local event = self.socket:GetEvent();
 
 	if event then 
+
 		local func = events[event.type];
 		if func then 
 			func(self, event);
@@ -158,8 +177,6 @@ function server:Tick()
 	
 	local msg = Assemble();
 	if msg then 
-		
-		self:ResetPing();
 		
 		if self.HalfOpen then 
 	
@@ -181,15 +198,24 @@ function server:Tick()
 			else
 				
 				if data.Action == 5 and data.Data then 
+
 					self.Clients = data.Data;
+					self.WebClient = nil;
+				elseif data.Action == 6 then
+
+					self.WebClient = data.TargetServerId;
+					self.WebClientIP = data.Data.IP;
+				else 
+
+					self.WebClient = nil;
 				end
 
 				self.RecvProc(data);
 			end
 		end
-	else 
-		self:Ping();
 	end 
+
+	self:Ping();
 end
 
 function server:NWServerStart(backendscript, serverid, address)
