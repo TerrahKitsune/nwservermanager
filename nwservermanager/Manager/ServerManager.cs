@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -21,10 +22,12 @@ namespace nwservermanager.Manager
         private readonly IServerValidator _validator;
         private readonly IFeedback _feedback;
         private TimeSpan _timeout;
+        private long _msgcnt;
 
         public ServerManager(int port, IServerValidator validator, IFeedback fb)
         {
-            _timeout = TimeSpan.FromSeconds(15);
+            _msgcnt = 0;
+            _timeout = TimeSpan.FromSeconds(10);
             _webrequests = new List<Dtos.WebRequest>();
             _feedback = fb ?? throw new NullReferenceException("No feedback provided");
             _validator = validator ?? throw new NullReferenceException("No validator provided");
@@ -63,7 +66,7 @@ namespace nwservermanager.Manager
 
             ServerClient targetcli = GetClientFromClientId(target);
 
-            if(targetcli == null)
+            if (targetcli == null)
             {
                 return null;
             }
@@ -102,7 +105,7 @@ namespace nwservermanager.Manager
             while (webrequest.Response == null)
             {
                 Thread.Sleep(1);
-                if(webrequest.Age > _timeout)
+                if (webrequest.Age > _timeout)
                 {
                     lock (_webrequests)
                     {
@@ -123,10 +126,10 @@ namespace nwservermanager.Manager
 
         private bool ProcessRequest(ServerClient from, string raw)
         {
-            try
-            { 
-                _feedback.WriteLine("Request: {0} -> {1}", from, raw);
+            _msgcnt++;
 
+            try
+            {
                 BaseTransmission request = Newtonsoft.Json.JsonConvert.DeserializeObject<BaseTransmission>(raw);
 
                 if (request.SessionId != from.SessionId)
@@ -136,10 +139,17 @@ namespace nwservermanager.Manager
 
                 ActionEnum action = (ActionEnum)request.Action;
 
+                if (action == ActionEnum.Ping || action == ActionEnum.Pong)
+                {
+                    return true;
+                }
+
                 ServerClient target = request.TargetServerId == Guid.Empty ? null : GetClientFromClientId(request.TargetServerId);
 
                 if (action == ActionEnum.SendMessageToTarget)
                 {
+                    _feedback.WriteLine("SendMessageToTarget: {0} -> {1}", from, raw);
+
                     target?.Send(Newtonsoft.Json.JsonConvert.SerializeObject(new BaseTransmission
                     {
                         Action = (int)ActionEnum.SendMessageToTarget,
@@ -151,6 +161,8 @@ namespace nwservermanager.Manager
                 }
                 else if (action == ActionEnum.WebRequest)
                 {
+                    _feedback.WriteLine("WebRequest: {0} -> {1}", from, raw);
+
                     Dtos.WebRequest webRequest;
 
                     lock (_webrequests)
@@ -161,13 +173,15 @@ namespace nwservermanager.Manager
                             .FirstOrDefault();
                     }
 
-                    if(webRequest != null)
+                    if (webRequest != null)
                     {
                         webRequest.SetResponse(request);
                     }
                 }
                 else if (action == ActionEnum.GetAllConnectedClients)
                 {
+                    _feedback.WriteLine("GetAllConnectedClients: {0} -> {1}", from, raw);
+
                     Dictionary<string, object> clients = new Dictionary<string, object>();
 
                     foreach (var item in _clients.Where(i => i.Value.State == ClientState.Ok).Select(i => i.Value))
@@ -183,6 +197,11 @@ namespace nwservermanager.Manager
                         Parameter = request.Parameter,
                         TargetServerId = Guid.Empty
                     }));
+                }
+                else
+                {
+                    _feedback.WriteLine("Unknown request: {0} from {1}", action, from);
+                    return false;
                 }
 
                 return true;
@@ -202,6 +221,8 @@ namespace nwservermanager.Manager
         private void Process()
         {
             List<Guid> dead = new List<Guid>();
+
+            bool update = false;
 
             while (_alive)
             {
@@ -232,6 +253,8 @@ namespace nwservermanager.Manager
                             string value = item.Value.Tick();
                             if (value != null)
                             {
+                                update = true;
+
                                 if (item.Value.State == ClientState.HalfOpen)
                                 {
                                     if (Guid.TryParse(value, out Guid serverid))
@@ -277,6 +300,8 @@ namespace nwservermanager.Manager
                     {
                         bool fromOkState = false;
 
+                        update = true;
+
                         dead.ForEach(i =>
                         {
                             if (_clients.TryRemove(i, out ServerClient dying))
@@ -300,6 +325,13 @@ namespace nwservermanager.Manager
                     _feedback.Error(ex, true);
                 }
 
+                if(update)
+                {
+                    _feedback.SetStatusLine($"{_clients.Count(i => i.Value.State == ClientState.Ok)} clients connected {_msgcnt} messages processed");
+
+                    update = false;
+                }
+
                 try
                 {
                     Thread.Sleep(1);
@@ -315,7 +347,7 @@ namespace nwservermanager.Manager
         {
             _alive = false;
 
-            if (_thread.ThreadState == ThreadState.WaitSleepJoin)
+            if (_thread.ThreadState == System.Threading.ThreadState.WaitSleepJoin)
             {
                 _thread.Interrupt();
             }

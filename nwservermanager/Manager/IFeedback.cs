@@ -13,5 +13,7 @@ namespace nwservermanager.Manager
         void WriteLine(string value);
 
         void WriteLine(string format, params object[] arg);
+
+        void SetStatusLine(string value);
     }
 }

@@ -318,7 +318,7 @@ function server:NWServerStart(backendscript, serverid, address)
 			pcall(v, duration);
 		end
 
-		return false;
+		return duration;
 	end);
 end
 
