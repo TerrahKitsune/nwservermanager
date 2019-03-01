@@ -50,6 +50,8 @@ end
 events[NETEVENT_DISCONNECTED] = function(srv, ev)
 
 	srv.Clients = {};
+	buffer = "";
+	length = nil;
 
 	if srv.sessionid == nil or srv.HalfOpen == true then	
 		return;
@@ -318,7 +320,8 @@ function server:NWServerStart(backendscript, serverid, address)
 			pcall(v, duration);
 		end
 
-		return duration;
+		Sleep(duration);
+		return false;
 	end);
 end
 

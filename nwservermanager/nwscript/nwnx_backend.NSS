@@ -9,7 +9,7 @@ const int SRV_ACTION_CLIENTSCONNECTEDUPDATE = 5;
 //serverId must be a GUID thats authenticated in the backend
 //backendAddress is the address to the backed
 //backendNWScript is the nwscript thats going to be the eventscript for the backend
-void StartBackendCliet(string serverId, string backendAddress, string backendNWScript);
+void StartBackendClient(string serverId, string backendAddress, string backendNWScript);
 
 //Retrives what kind of event is being triggred
 //Returns SRV_ACTION_* constant
@@ -50,7 +50,7 @@ string GetServerIsConnected(string serverId);
 
 string GetServerIsConnected(string serverId){
 
-	return RunLuaString("return Env.Get('serverclient'):IsConnected('"+serverId+"') or '';");
+	return RunLuaString("return Env.Get('serverclient'):GetConnectedServer('"+serverId+"') or '';");
 }
 
 string GetFirstBackendDataKey(){
@@ -97,7 +97,7 @@ int GetLastBackendActionType(){
 	return StringToInt(RunLuaString("return Env.Get('serverclient'):LastGetAction();"));
 }
 
-void StartBackendCliet(string serverId, string backendAddress, string backendNWScript){
+void StartBackendClient(string serverId, string backendAddress, string backendNWScript){
 
 	RunLuaString("local backend=dofile('nwserverbackend.lua'); backend:NWServerStart('"+backendNWScript+"', '"+serverId+"', '"+backendAddress+"');");
 }
